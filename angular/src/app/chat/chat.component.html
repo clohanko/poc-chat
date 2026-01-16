@@ -1,0 +1,104 @@
+<!-- on affiche le titre de la page -->
+<h2>PoC Support (WebSocket)</h2>
+
+<!-- on montre le formulaire de connexion si on est deconnecte -->
+<div *ngIf="!user" class="login-panel">
+  <div style="font-weight:bold; margin-bottom:8px;">Connexion</div>
+  <div class="login-form">
+    <input [(ngModel)]="email" placeholder="Email" />
+    <input [(ngModel)]="password" placeholder="Mot de passe" type="password" />
+    <button (click)="login()">Se connecter</button>
+  </div>
+</div>
+
+<!-- on affiche la zone principale si on est connecte -->
+<div *ngIf="user" class="layout">
+  <!-- on affiche la colonne de liste de tickets -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div>
+        <div style="font-weight:bold;">Tickets</div>
+        <small>{{ user.email }} ({{ user.role }})</small>
+      </div>
+      <button (click)="logout()">Deconnexion</button>
+    </div>
+    <!-- on affiche le formulaire de creation de ticket pour les clients -->
+    <div *ngIf="user?.role === 'CLIENT'" class="new-ticket">
+      <div style="font-weight:bold; margin-bottom:6px;">Nouveau ticket</div>
+      <div class="new-ticket-form">
+        <input [(ngModel)]="newTicketSubject" placeholder="Sujet" />
+        <select [(ngModel)]="selectedReservationId">
+          <option value="">Reservation (optionnel)</option>
+          <option *ngFor="let r of reservations" [value]="r.id">
+            {{ reservationLabel(r) }} - {{ r.startAt | date:'shortDate' }} au {{ r.endAt | date:'shortDate' }} ({{ r.status }})
+          </option>
+        </select>
+        <button (click)="createTicket()" [disabled]="!newTicketSubject.trim()">Creer</button>
+      </div>
+    </div>
+    <!-- on affiche un message si la liste est vide -->
+    <div *ngIf="threads.length === 0" class="empty-state">
+      <small>Aucun ticket</small>
+    </div>
+    <!-- on liste chaque ticket disponible -->
+    <div *ngFor="let t of threads" class="ticket-item" [class.selected]="selectedThread?.id === t.id"
+         (click)="selectThread(t)"
+         >
+      <div class="ticket-item-header">
+        <div style="font-weight:bold;">{{ t.subject }}</div>
+        <!-- on permet a un agent support d accepter un ticket libre -->
+        <button *ngIf="user?.role === 'SUPPORT' && !t.assignedSupportUserId" (click)="claimTicket(t, $event)">Accepter</button>
+      </div>
+      <small>{{ t.createdByName || t.createdByEmail }}</small>
+      <div><small>Statut: {{ t.status }}</small></div>
+      <div *ngIf="t.reservationId && reservationById(t.reservationId) as res">
+        <small>Reservation: {{ reservationLabel(res) }}</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- on affiche la zone de discussion -->
+  <div class="chat-panel">
+    <!-- on montre les infos du ticket selectionne -->
+    <div style="margin-bottom:6px;" *ngIf="selectedThread as st">
+      <div class="thread-header">
+        <div style="font-weight:bold;">{{ st.subject || 'Choisir un ticket' }}</div>
+        <!-- on autorise la cloture si le support est assigne -->
+        <button *ngIf="user?.role === 'SUPPORT' && st.status !== 'CLOSED' && st.assignedSupportUserId === user?.userId" (click)="closeTicket()">Clore</button>
+      </div>
+      <small>Cree par {{ st.createdByName || st.createdByEmail }} · Statut: {{ st.status }}</small>
+      <!-- on informe le client du support qui prend en charge -->
+      <div *ngIf="user?.role === 'CLIENT' && (st.assignedSupportName || st.assignedSupportEmail)">
+        <small>Votre ticket a ete pris en charge par {{ st.assignedSupportName || st.assignedSupportEmail }}</small>
+      </div>
+      <div *ngIf="st.reservationId && reservationById(st.reservationId) as res">
+        <small>
+          Reservation {{ reservationLabel(res) }} -
+          {{ res.startAt | date:'shortDate' }} au
+          {{ res.endAt | date:'shortDate' }}
+        </small>
+      </div>
+    </div>
+
+    <!-- on affiche l historique des messages -->
+    <div class="messages">
+      <div *ngFor="let m of messages" class="message-item">
+        <small>{{ m.sentAt | date:'short' }}</small>
+        <strong> {{ senderLabel(m) }}</strong>
+        <div>{{ m.content }}</div>
+      </div>
+    </div>
+    <!-- on affiche un indicateur de frappe -->
+    <div *ngIf="typingLabel" class="typing-label">
+      <small>{{ typingLabel }}</small>
+    </div>
+
+    <!-- on affiche la zone de saisie -->
+    <div class="input-row">
+      <input class="message-input" [(ngModel)]="content" placeholder="Message..." (input)="onTypingInput()" (keyup.enter)="send()"
+             [disabled]="!canSend()" />
+      <button (click)="send()" [disabled]="!canSend()">Envoyer</button>
+      <button (click)="clear()">Effacer</button>
+    </div>
+  </div>
+</div>
