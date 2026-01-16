@@ -1,0 +1,22 @@
+services:
+  db:
+    image: mariadb:11.4
+    container_name: ycyw-db
+    environment:
+      MARIADB_DATABASE: ycyw
+      MARIADB_USER: ycyw
+      MARIADB_PASSWORD: ycyw
+      MARIADB_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - ycyw_db_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  ycyw_db_data:
