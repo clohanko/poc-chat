@@ -3,6 +3,7 @@ package com.ycwy.poc_chat.support;
 import com.ycwy.poc_chat.security.SecurityUtils;
 import com.ycwy.poc_chat.chat.ChatMessage;
 import com.ycwy.poc_chat.support.dto.MessageDto;
+import com.ycwy.poc_chat.support.dto.SupportAgentDto;
 import com.ycwy.poc_chat.support.dto.ThreadDto;
 import com.ycwy.poc_chat.user.User;
 import com.ycwy.poc_chat.user.UserRepository;
@@ -202,6 +203,50 @@ public class SupportThreadController {
         return toDto(thread);
     }
 
+    @PostMapping("/{threadId}/transfer")
+    public ThreadDto transferThread(@PathVariable String threadId, @RequestBody TransferRequest request) {
+        String role = SecurityUtils.currentRole();
+        if (!"SUPPORT".equals(role)) {
+            throw new ResponseStatusException(FORBIDDEN, "Not allowed");
+        }
+        String userId = SecurityUtils.currentUserId();
+        SupportThread thread = threadRepository.findById(threadId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Thread not found"));
+        String assigned = thread.getAssignedSupportUserId();
+        if (assigned == null || !assigned.equals(userId)) {
+            throw new ResponseStatusException(FORBIDDEN, "Not allowed");
+        }
+        if ("CLOSED".equalsIgnoreCase(thread.getStatus())) {
+            throw new ResponseStatusException(BAD_REQUEST, "Thread is closed");
+        }
+        String targetSupportId = request == null ? null : request.supportUserId();
+        if (targetSupportId == null || targetSupportId.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "Support user is required");
+        }
+        if (targetSupportId.equals(userId)) {
+            throw new ResponseStatusException(BAD_REQUEST, "Cannot transfer to self");
+        }
+        User target = userRepository.findById(targetSupportId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Support user not found"));
+        if (!"SUPPORT".equalsIgnoreCase(target.getRole())) {
+            throw new ResponseStatusException(BAD_REQUEST, "Target is not support");
+        }
+
+        thread.setAssignedSupportUserId(targetSupportId);
+        SupportThread saved = threadRepository.save(thread);
+        ThreadDto dto = toDto(saved);
+        publishThreadUpdate(dto, true);
+        publishTransferMessage(saved, userId, target);
+        return dto;
+    }
+
+    @GetMapping("/support-users")
+    public List<SupportAgentDto> listSupportAgents() {
+        return userRepository.findByRole("SUPPORT").stream()
+                .map(user -> new SupportAgentDto(user.getId(), displayName(user), user.getEmail()))
+                .toList();
+    }
+
     @GetMapping("/{threadId}/messages")
     public List<MessageDto> listMessages(@PathVariable String threadId) {
         SupportThread thread = threadRepository.findById(threadId)
@@ -312,6 +357,36 @@ public class SupportThreadController {
         messagingTemplate.convertAndSend("/topic/threads/" + thread.getId(), payload);
     }
 
+    private void publishTransferMessage(SupportThread thread, String fromSupportUserId, User targetSupport) {
+        User fromSupport = userRepository.findById(fromSupportUserId).orElse(null);
+        String targetLabel = displayName(targetSupport);
+        targetLabel = targetLabel == null || targetLabel.isBlank() ? targetSupport.getEmail() : targetLabel;
+        String fromLabel = displayName(fromSupport);
+        fromLabel = fromLabel == null || fromLabel.isBlank()
+                ? (fromSupport == null ? "Support" : fromSupport.getEmail())
+                : fromLabel;
+        String content = "Votre ticket a ete transfere a " + targetLabel + ".";
+
+        SupportMessage supportMessage = new SupportMessage();
+        supportMessage.setContent(content);
+        supportMessage.setThreadId(thread.getId());
+        supportMessage.setSenderUserId(fromSupportUserId);
+        SupportMessage saved = messageRepository.save(supportMessage);
+
+        ChatMessage payload = new ChatMessage(
+                saved.getContent(),
+                saved.getSentAt(),
+                saved.getThreadId(),
+                saved.getSenderUserId(),
+                fromLabel,
+                fromSupport == null ? null : fromSupport.getEmail()
+        );
+        messagingTemplate.convertAndSend("/topic/threads/" + thread.getId(), payload);
+    }
+
     public record CreateThreadRequest(String subject, String reservationId) {
+    }
+
+    public record TransferRequest(String supportUserId) {
     }
 }

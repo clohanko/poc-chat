@@ -258,7 +258,9 @@ INSERT IGNORE INTO users (id, email, password_hash, first_name, last_name, role)
 VALUES
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'client@test.com', '{noop}123soleil', 'Client', 'Demo', 'CLIENT'),
   ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'client2@test.com', '{noop}123soleil', 'Client', 'Demo2', 'CLIENT'),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'support@test.com', '{noop}123soleil', 'Support', 'Agent', 'SUPPORT');
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'support@test.com', '{noop}123soleil', 'Support', 'Agent', 'SUPPORT'),
+  ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'support2@test.com', '{noop}123soleil', 'Support', 'Agent2', 'SUPPORT'),
+  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'support3@test.com', '{noop}123soleil', 'Support', 'Agent3', 'SUPPORT');
 
 INSERT IGNORE INTO agencies (id, name, city, country_code)
 VALUES

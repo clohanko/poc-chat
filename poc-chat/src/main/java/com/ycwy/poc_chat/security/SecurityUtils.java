@@ -3,6 +3,7 @@ package com.ycwy.poc_chat.security;
 import io.jsonwebtoken.Claims;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.GrantedAuthority;
 
 public final class SecurityUtils {
 
@@ -16,7 +17,20 @@ public final class SecurityUtils {
 
     public static String currentRole() {
         Claims claims = currentClaims();
-        return claims == null ? null : claims.get("role", String.class);
+        if (claims != null) {
+            return claims.get("role", String.class);
+        }
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return null;
+        }
+        for (GrantedAuthority authority : authentication.getAuthorities()) {
+            String role = authority.getAuthority();
+            if (role != null && role.startsWith("ROLE_")) {
+                return role.substring("ROLE_".length());
+            }
+        }
+        return null;
     }
 
     public static String currentEmail() {

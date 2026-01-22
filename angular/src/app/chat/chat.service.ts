@@ -41,6 +41,12 @@ export interface ReservationItem {
   carCategoryCode: string;
 }
 
+export interface SupportAgent {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+}
+
 export interface TypingEvent {
   // on decrit les evenements de frappe en temps reel
   threadId: string;
@@ -161,6 +167,11 @@ export class ChatService {
     return this.http.get<ReservationItem[]>(`${this.apiBase}/reservations`);
   }
 
+  listSupportAgents(): Observable<SupportAgent[]> {
+    // on charge les agents support pour le transfert
+    return this.http.get<SupportAgent[]>(`${this.apiBase}/threads/support-users`);
+  }
+
   createThread(subject: string, reservationId?: string | null): Observable<ThreadItem> {
     // on cree un nouveau ticket cote API
     const body = reservationId ? { subject, reservationId } : { subject };
@@ -175,6 +186,11 @@ export class ChatService {
   claimThread(threadId: string): Observable<ThreadItem> {
     // on accepte un ticket en tant que support
     return this.http.post<ThreadItem>(`${this.apiBase}/threads/${threadId}/claim`, {});
+  }
+
+  transferThread(threadId: string, supportUserId: string): Observable<ThreadItem> {
+    // on transfere un ticket vers un autre support
+    return this.http.post<ThreadItem>(`${this.apiBase}/threads/${threadId}/transfer`, { supportUserId });
   }
 
   loadMessages(threadId: string): Observable<ChatMessage[]> {

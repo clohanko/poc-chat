@@ -1,5 +1,5 @@
 export const environment = {
   production: false,
-  apiBase: '/api',
-  wsBase: '/ws-chat'
+  apiBase: 'http://localhost:8080/api',
+  wsBase: 'ws://localhost:8080/ws-chat'
 };

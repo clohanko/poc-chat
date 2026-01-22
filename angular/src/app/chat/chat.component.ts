@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { AuthService, AuthUser } from '../auth/auth.service';
-import { ChatMessage, ChatService, ReservationItem, ThreadItem, TypingEvent } from './chat.service';
+import { ChatMessage, ChatService, ReservationItem, SupportAgent, ThreadItem, TypingEvent } from './chat.service';
 
 @Component({
   selector: 'app-chat',
@@ -21,8 +21,11 @@ export class ChatComponent implements OnInit, OnDestroy {
   threads: ThreadItem[] = [];
   selectedThread?: ThreadItem;
   reservations: ReservationItem[] = [];
+  supportAgents: SupportAgent[] = [];
   newTicketSubject = '';
   selectedReservationId = '';
+  selectedTransferUserId = '';
+  ticketFilter: 'ALL' | 'OPEN' | 'PENDING' | 'CLOSED' = 'ALL';
   typingLabel = '';
   user?: AuthUser | null;
   email = 'client@test.com';
@@ -73,6 +76,7 @@ export class ChatComponent implements OnInit, OnDestroy {
           this.clearTypingUsers();
         }
       }
+      this.syncSelectionWithFilter();
     });
     // on ecoute les evenements de frappe
     this.typingSub = this.chat.typing$.subscribe(event => this.onTypingEvent(event));
@@ -91,8 +95,11 @@ export class ChatComponent implements OnInit, OnDestroy {
         this.messages = [];
         this.selectedThread = undefined;
         this.reservations = [];
+        this.supportAgents = [];
         this.newTicketSubject = '';
         this.selectedReservationId = '';
+        this.selectedTransferUserId = '';
+        this.ticketFilter = 'ALL';
         this.clearTypingUsers();
         this.typingLabel = '';
         this.typingThreadId = undefined;
@@ -152,6 +159,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.chat.loadMessages(thread.id).subscribe();
     this.chat.subscribeToThread(thread.id);
     this.clearTypingUsers();
+    this.selectedTransferUserId = '';
   }
 
   createTicket(): void {
@@ -217,6 +225,23 @@ export class ChatComponent implements OnInit, OnDestroy {
     });
   }
 
+  transferTicket(): void {
+    // on transfere un ticket vers un autre support
+    if (!this.selectedThread || !this.selectedTransferUserId) return;
+    if (!this.user || this.user.role !== 'SUPPORT') return;
+    if (this.selectedThread.assignedSupportUserId !== this.user.userId) return;
+    this.chat.transferThread(this.selectedThread.id, this.selectedTransferUserId).subscribe({
+      next: updated => {
+        this.threads = this.threads.map(t => (t.id === updated.id ? updated : t));
+        if (this.selectedThread?.id === updated.id) {
+          this.selectedThread = updated;
+        }
+        this.selectedTransferUserId = '';
+      },
+      error: () => alert('Transfert du ticket echoue')
+    });
+  }
+
   reservationById(reservationId?: string | null): ReservationItem | undefined {
     // on retrouve une reservation par son id
     if (!reservationId) return undefined;
@@ -232,6 +257,38 @@ export class ChatComponent implements OnInit, OnDestroy {
         return 'Voiture 4 places';
       default:
         return reservation.carCategoryCode;
+    }
+  }
+
+  openTicketsCount(): number {
+    return this.threads.filter(t => t.status !== 'CLOSED' && !!t.assignedSupportUserId).length;
+  }
+
+  closedTicketsCount(): number {
+    return this.threads.filter(t => t.status === 'CLOSED').length;
+  }
+
+  pendingTicketsCount(): number {
+    return this.threads.filter(t => t.status !== 'CLOSED' && !t.assignedSupportUserId).length;
+  }
+
+  setTicketFilter(filter: 'OPEN' | 'PENDING' | 'CLOSED'): void {
+    // on bascule l affichage de la liste
+    this.ticketFilter = this.ticketFilter === filter ? 'ALL' : filter;
+    this.syncSelectionWithFilter();
+  }
+
+  filteredThreads(): ThreadItem[] {
+    // on applique un filtre local a la liste
+    switch (this.ticketFilter) {
+      case 'OPEN':
+        return this.threads.filter(t => t.status !== 'CLOSED' && !!t.assignedSupportUserId);
+      case 'PENDING':
+        return this.threads.filter(t => t.status !== 'CLOSED' && !t.assignedSupportUserId);
+      case 'CLOSED':
+        return this.threads.filter(t => t.status === 'CLOSED');
+      default:
+        return this.threads;
     }
   }
 
@@ -311,8 +368,10 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.chat.listThreads().subscribe({
       next: threads => {
         this.threads = threads;
-        if (threads.length > 0) {
-          this.selectThread(threads[0]);
+        this.syncSelectionWithFilter();
+        const filtered = this.filteredThreads();
+        if (filtered.length > 0) {
+          this.selectThread(filtered[0]);
         }
       },
       error: () => alert('Chargement des tickets echoue')
@@ -325,5 +384,27 @@ export class ChatComponent implements OnInit, OnDestroy {
         error: () => alert('Chargement des reservations echoue')
       });
     }
+
+    if (this.user?.role === 'SUPPORT') {
+      // on charge la liste des agents support pour les transferts
+      this.chat.listSupportAgents().subscribe({
+        next: agents => {
+          this.supportAgents = this.user
+            ? agents.filter(agent => agent.id !== this.user?.userId)
+            : agents;
+        },
+        error: () => alert('Chargement des agents support echoue')
+      });
+    }
+  }
+
+  private syncSelectionWithFilter(): void {
+    // on annule la selection si elle n apparait plus dans la liste filtre
+    if (!this.selectedThread) return;
+    if (this.filteredThreads().some(t => t.id === this.selectedThread?.id)) return;
+    this.selectedThread = undefined;
+    this.messages = [];
+    this.clearTypingUsers();
+    this.typingLabel = '';
   }
 }

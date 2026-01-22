@@ -1,1 +1,115 @@
-/* on centralise ici les styles globaux de l application */
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600&display=swap");
+
+:root {
+  --ink-900: #1f2530;
+  --ink-700: #2f3642;
+  --ink-500: #6b7382;
+  --surface-0: #ffffff;
+  --surface-1: #f5f7fb;
+  --surface-2: #eaf6fb;
+  --accent-600: #255bd6;
+  --accent-500: #2d69ff;
+  --accent-200: #d6ecf6;
+  --brand-orange: #ff4a1a;
+  --brand-teal: #8cc8d6;
+  --shadow-1: 0 12px 28px rgba(31, 37, 48, 0.12);
+  --shadow-2: 0 20px 44px rgba(31, 37, 48, 0.16);
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  color: var(--ink-900);
+  background-color: var(--surface-1);
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  background: var(--accent-600);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+  box-shadow: 0 8px 18px rgba(37, 91, 214, 0.24);
+}
+
+button:hover {
+  transform: translateY(-1px);
+  background: var(--accent-500);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(19, 21, 35, 0.15);
+  background: #fff;
+  color: var(--ink-900);
+  transition: border 160ms ease, box-shadow 160ms ease;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: rgba(37, 91, 214, 0.5);
+  box-shadow: 0 0 0 3px rgba(37, 91, 214, 0.15);
+}
+
+small {
+  color: var(--ink-500);
+}
+
+.fade-in {
+  animation: fadeInUp 420ms ease both;
+}
+
+.stagger > * {
+  animation: fadeInUp 520ms ease both;
+}
+
+.stagger > *:nth-child(2) {
+  animation-delay: 80ms;
+}
+
+.stagger > *:nth-child(3) {
+  animation-delay: 140ms;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

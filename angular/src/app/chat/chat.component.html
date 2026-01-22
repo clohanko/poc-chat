@@ -1,104 +1,149 @@
-<!-- on affiche le titre de la page -->
-<h2>PoC Support (WebSocket)</h2>
+<div class="page">
+  <header class="topbar fade-in">
+    <div class="brand">
+      <img class="brand-logo" src="assets/logo-support.png" alt="Your Car Your Way" />
+      <div class="brand-subtitle">PoC WebSocket Desk</div>
+    </div>
+    <div class="topbar-stats" *ngIf="user?.role === 'SUPPORT'">
+      <button class="stat-chip" type="button" [class.active]="ticketFilter === 'OPEN'" (click)="setTicketFilter('OPEN')">
+        <span class="stat-label">En cours</span>
+        <span class="stat-value">{{ openTicketsCount() }}</span>
+      </button>
+      <button class="stat-chip" type="button" [class.active]="ticketFilter === 'PENDING'" (click)="setTicketFilter('PENDING')">
+        <span class="stat-label">En attente</span>
+        <span class="stat-value">{{ pendingTicketsCount() }}</span>
+      </button>
+      <button class="stat-chip" type="button" [class.active]="ticketFilter === 'CLOSED'" (click)="setTicketFilter('CLOSED')">
+        <span class="stat-label">Fermes</span>
+        <span class="stat-value">{{ closedTicketsCount() }}</span>
+      </button>
+    </div>
+    <div class="topbar-meta" *ngIf="user">
+      <div class="status-pill">Connecte: {{ user.email }} - {{ user.role }}</div>
+      <button class="ghost" (click)="logout()">Deconnexion</button>
+    </div>
+  </header>
 
-<!-- on montre le formulaire de connexion si on est deconnecte -->
-<div *ngIf="!user" class="login-panel">
-  <div style="font-weight:bold; margin-bottom:8px;">Connexion</div>
-  <div class="login-form">
-    <input [(ngModel)]="email" placeholder="Email" />
-    <input [(ngModel)]="password" placeholder="Mot de passe" type="password" />
-    <button (click)="login()">Se connecter</button>
-  </div>
-</div>
+  <main class="main fade-in">
+    <section *ngIf="!user" class="login-panel card">
+      <div class="login-copy">
+        <p class="eyebrow">Bienvenue</p>
+        <h2>Support client en temps reel</h2>
+        <p class="muted">Connectez-vous pour ouvrir un ticket ou accompagner un client.</p>
+      </div>
+      <div class="login-form stagger">
+        <input [(ngModel)]="email" placeholder="Email" />
+        <input [(ngModel)]="password" placeholder="Mot de passe" type="password" />
+        <button (click)="login()">Se connecter</button>
+      </div>
+    </section>
 
-<!-- on affiche la zone principale si on est connecte -->
-<div *ngIf="user" class="layout">
-  <!-- on affiche la colonne de liste de tickets -->
-  <div class="sidebar">
-    <div class="sidebar-header">
-      <div>
-        <div style="font-weight:bold;">Tickets</div>
-        <small>{{ user.email }} ({{ user.role }})</small>
-      </div>
-      <button (click)="logout()">Deconnexion</button>
-    </div>
-    <!-- on affiche le formulaire de creation de ticket pour les clients -->
-    <div *ngIf="user?.role === 'CLIENT'" class="new-ticket">
-      <div style="font-weight:bold; margin-bottom:6px;">Nouveau ticket</div>
-      <div class="new-ticket-form">
-        <input [(ngModel)]="newTicketSubject" placeholder="Sujet" />
-        <select [(ngModel)]="selectedReservationId">
-          <option value="">Reservation (optionnel)</option>
-          <option *ngFor="let r of reservations" [value]="r.id">
-            {{ reservationLabel(r) }} - {{ r.startAt | date:'shortDate' }} au {{ r.endAt | date:'shortDate' }} ({{ r.status }})
-          </option>
-        </select>
-        <button (click)="createTicket()" [disabled]="!newTicketSubject.trim()">Creer</button>
-      </div>
-    </div>
-    <!-- on affiche un message si la liste est vide -->
-    <div *ngIf="threads.length === 0" class="empty-state">
-      <small>Aucun ticket</small>
-    </div>
-    <!-- on liste chaque ticket disponible -->
-    <div *ngFor="let t of threads" class="ticket-item" [class.selected]="selectedThread?.id === t.id"
-         (click)="selectThread(t)"
-         >
-      <div class="ticket-item-header">
-        <div style="font-weight:bold;">{{ t.subject }}</div>
-        <!-- on permet a un agent support d accepter un ticket libre -->
-        <button *ngIf="user?.role === 'SUPPORT' && !t.assignedSupportUserId" (click)="claimTicket(t, $event)">Accepter</button>
-      </div>
-      <small>{{ t.createdByName || t.createdByEmail }}</small>
-      <div><small>Statut: {{ t.status }}</small></div>
-      <div *ngIf="t.reservationId && reservationById(t.reservationId) as res">
-        <small>Reservation: {{ reservationLabel(res) }}</small>
-      </div>
-    </div>
-  </div>
+    <section *ngIf="user" class="layout">
+      <aside class="sidebar card">
+        <div class="sidebar-header">
+          <div>
+            <p class="eyebrow">Tickets</p>
+            <h3>File active</h3>
+            <small>{{ user.email }}</small>
+          </div>
+          <div class="user-chip">{{ user.role }}</div>
+        </div>
 
-  <!-- on affiche la zone de discussion -->
-  <div class="chat-panel">
-    <!-- on montre les infos du ticket selectionne -->
-    <div style="margin-bottom:6px;" *ngIf="selectedThread as st">
-      <div class="thread-header">
-        <div style="font-weight:bold;">{{ st.subject || 'Choisir un ticket' }}</div>
-        <!-- on autorise la cloture si le support est assigne -->
-        <button *ngIf="user?.role === 'SUPPORT' && st.status !== 'CLOSED' && st.assignedSupportUserId === user?.userId" (click)="closeTicket()">Clore</button>
-      </div>
-      <small>Cree par {{ st.createdByName || st.createdByEmail }} · Statut: {{ st.status }}</small>
-      <!-- on informe le client du support qui prend en charge -->
-      <div *ngIf="user?.role === 'CLIENT' && (st.assignedSupportName || st.assignedSupportEmail)">
-        <small>Votre ticket a ete pris en charge par {{ st.assignedSupportName || st.assignedSupportEmail }}</small>
-      </div>
-      <div *ngIf="st.reservationId && reservationById(st.reservationId) as res">
-        <small>
-          Reservation {{ reservationLabel(res) }} -
-          {{ res.startAt | date:'shortDate' }} au
-          {{ res.endAt | date:'shortDate' }}
-        </small>
-      </div>
-    </div>
+        <div *ngIf="user?.role === 'CLIENT'" class="new-ticket">
+          <div class="new-ticket-title">Nouveau ticket</div>
+          <div class="new-ticket-form">
+            <input [(ngModel)]="newTicketSubject" placeholder="Sujet" />
+            <select [(ngModel)]="selectedReservationId">
+              <option value="">Reservation (optionnel)</option>
+              <option *ngFor="let r of reservations" [value]="r.id">
+                {{ reservationLabel(r) }} - {{ r.startAt | date:'shortDate' }} au {{ r.endAt | date:'shortDate' }} ({{ r.status }})
+              </option>
+            </select>
+            <button (click)="createTicket()" [disabled]="!newTicketSubject.trim()">Creer</button>
+          </div>
+        </div>
 
-    <!-- on affiche l historique des messages -->
-    <div class="messages">
-      <div *ngFor="let m of messages" class="message-item">
-        <small>{{ m.sentAt | date:'short' }}</small>
-        <strong> {{ senderLabel(m) }}</strong>
-        <div>{{ m.content }}</div>
-      </div>
-    </div>
-    <!-- on affiche un indicateur de frappe -->
-    <div *ngIf="typingLabel" class="typing-label">
-      <small>{{ typingLabel }}</small>
-    </div>
+        <div *ngIf="filteredThreads().length === 0" class="empty-state">
+          <small>Aucun ticket pour ce filtre</small>
+        </div>
 
-    <!-- on affiche la zone de saisie -->
-    <div class="input-row">
-      <input class="message-input" [(ngModel)]="content" placeholder="Message..." (input)="onTypingInput()" (keyup.enter)="send()"
-             [disabled]="!canSend()" />
-      <button (click)="send()" [disabled]="!canSend()">Envoyer</button>
-      <button (click)="clear()">Effacer</button>
-    </div>
-  </div>
+        <div class="ticket-list">
+          <div *ngFor="let t of filteredThreads()" class="ticket-item"
+               [class.selected]="selectedThread?.id === t.id"
+               [class.closed]="t.status === 'CLOSED'"
+               (click)="selectThread(t)">
+            <div class="ticket-item-header">
+              <div class="ticket-title">{{ t.subject }}</div>
+              <button class="tiny" *ngIf="user?.role === 'SUPPORT' && !t.assignedSupportUserId" (click)="claimTicket(t, $event)">
+                Accepter
+              </button>
+            </div>
+            <small>{{ t.createdByName || t.createdByEmail }}</small>
+            <div class="ticket-meta">Statut: {{ t.status }}</div>
+            <div *ngIf="t.reservationId && reservationById(t.reservationId) as res" class="ticket-meta">
+              Reservation: {{ reservationLabel(res) }}
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <section class="chat-panel card">
+        <div *ngIf="selectedThread as st" class="thread-summary">
+          <div class="thread-title">
+            <div>
+              <p class="eyebrow">Conversation</p>
+              <h3>{{ st.subject || 'Choisir un ticket' }}</h3>
+            </div>
+            <button class="ghost" *ngIf="user?.role === 'SUPPORT' && st.status !== 'CLOSED' && st.assignedSupportUserId === user?.userId"
+                    (click)="closeTicket()">
+              Clore
+            </button>
+          </div>
+          <div class="thread-meta">
+            <span>Cree par {{ st.createdByName || st.createdByEmail }}</span>
+            <span class="dot"></span>
+            <span>Statut: {{ st.status }}</span>
+          </div>
+          <div class="thread-meta" *ngIf="user?.role === 'CLIENT' && (st.assignedSupportName || st.assignedSupportEmail)">
+            <span>Pris en charge par {{ st.assignedSupportName || st.assignedSupportEmail }}</span>
+          </div>
+          <div class="thread-meta" *ngIf="st.reservationId && reservationById(st.reservationId) as res">
+            <span>Reservation {{ reservationLabel(res) }} - {{ res.startAt | date:'shortDate' }} au {{ res.endAt | date:'shortDate' }}</span>
+          </div>
+          <div class="transfer-row"
+               *ngIf="user?.role === 'SUPPORT' && st.status !== 'CLOSED' && st.assignedSupportUserId === user?.userId">
+            <select [(ngModel)]="selectedTransferUserId">
+              <option value="">Transferer vers...</option>
+              <option *ngFor="let agent of supportAgents" [value]="agent.id">
+                {{ agent.name || agent.email }}
+              </option>
+            </select>
+            <button class="ghost" (click)="transferTicket()" [disabled]="!selectedTransferUserId">Transferer</button>
+          </div>
+        </div>
+
+        <div class="messages">
+          <div *ngFor="let m of messages" class="message-item">
+            <div class="message-meta">
+              <span class="message-sender">{{ senderLabel(m) }}</span>
+              <span class="message-time">{{ m.sentAt | date:'short' }}</span>
+            </div>
+            <div class="message-body">{{ m.content }}</div>
+          </div>
+        </div>
+
+        <div *ngIf="typingLabel" class="typing-label">
+          <span class="typing-dot"></span>
+          <small>{{ typingLabel }}</small>
+        </div>
+
+        <div class="input-row">
+          <input class="message-input" [(ngModel)]="content" placeholder="Message..." (input)="onTypingInput()"
+                 (keyup.enter)="send()" [disabled]="!canSend()" />
+          <button (click)="send()" [disabled]="!canSend()">Envoyer</button>
+          <button class="ghost" (click)="clear()">Effacer</button>
+        </div>
+      </section>
+    </section>
+  </main>
 </div>
